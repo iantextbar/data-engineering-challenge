@@ -1,0 +1,47 @@
+import os
+import logging
+from typing import Dict
+
+import duckdb
+
+# Declarar globals
+logger = logging.getLogger(__name__)
+
+class NYCExtractor:
+
+    def __init__(self):
+
+        # Garantia da seguranca das credenciais 
+        # (para o exemplo em particular fallbacks explicitas) pois dados nao sao sensiveis
+        self.host = os.environ.get("DW_DB_HOST", "localhost")
+        self.port = os.environ.get("DW_DB_PORT", "5433")
+        self.dbname = os.environ.get("DW_DB_NAME", "nyc")
+        self.user = os.environ.get("DW_DB_USER", "user")
+        self.password = os.environ.get("DW_DB_PASSWORD", "datarisk")
+
+        self.conn_string = f"host={self.host} port={self.port} dbname={self.dbname} user={self.user} password={self.password}"
+
+    def insert_parquet_file(self, filename: str) -> Dict[str, int]:
+        
+        try:
+
+            logger.info(f"Iniciando extracao do arquivo {filename}")
+
+            # Conexao e instalacao manual da interacao com Postgres
+            con = duckdb.connect()
+            con.execute("INSTALL postgres; LOAD postgres;")
+
+            # Conectar com a base
+            con.execute(f"ATTACH '{self.conn_string}' AS pg (TYPE POSTGRES);")
+
+            # Inserir dados do arquivo postgres
+            con.execute(f"INSERT INTO pg.raw_nyc_tlc_data SELECT * FROM read_parquet({filename})")
+
+            con.close()
+
+            logger.info(f"Processo de extracao completo!")
+
+            return {'statusCode': 200}
+        except Exception as e:
+            logger.error(f"ERRO para {filename}: {str(e)}")
+            return {'statusCode': 400}
