@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS raw_nyc_tlc_data (
     PULocationID INT,
     DOLocationID INT,
     payment_type INT,
-    fare_amount NUMERIC(12, 2),
+    fare_amount NUMERIC(16, 2),
     extra NUMERIC,
     mta_tax NUMERIC,
     tip_amount NUMERIC(10, 2),

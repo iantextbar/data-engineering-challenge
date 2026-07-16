@@ -11,7 +11,7 @@ DBNAME = os.environ.get("DW_DB_NAME", "nyc")
 BRONZE_DATASET = Asset(name="postgres_bronze", uri=f"postgres://{HOST}:{PORT}/{DBNAME}/public/raw_nyc_tlc_data")
 SILVER_DATASET = Asset(name="postgres_silver", uri=f"postgres://{HOST}:{PORT}/{DBNAME}/public/trusted_nyc_tlc_data")
 
-@task(outlets=BRONZE_DATASET)
+@task
 def transform_to_silver():
 
     from scripts.silver.nyc_data_transformer import NYCTransformer
@@ -33,7 +33,7 @@ def emit_silver(result: Dict[str, Any]):
     dag_id='silver_nyc_processing',
     schedule=[BRONZE_DATASET], 
     start_date=datetime(2026, 1, 1),
-    catchup=False
+    tags=['silver', 'nyc', 'postgres']
 )
 def silver_processing():
     
