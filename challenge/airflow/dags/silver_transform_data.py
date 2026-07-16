@@ -16,8 +16,7 @@ def transform_to_silver():
 
     from scripts.silver.nyc_data_transformer import NYCTransformer
     
-    transformer = NYCTransformer()
-    result = transformer.transform()
+    result = NYCTransformer.transform()
 
     return result
 
