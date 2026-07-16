@@ -9,16 +9,22 @@ DATA_PATH = "/opt/airflow/data/"
 DEFAULT_ARGS = {'owner': 'airflow'}
 
 # Resgatando variaveis ambiente do docker compose
-ENV = os.environ.get("DW_DB_HOST", "dev")
+ENV = os.environ.get("DW_DB_HOST", "prod")
 HOST = os.environ.get("DW_DB_HOST", "localhost")
 PORT = os.environ.get("DW_DB_PORT", "5433")
 DBNAME = os.environ.get("DW_DB_NAME", "nyc")
 
 # Declarando asset
-BRONZE_DATASET = Asset(name="postgres_bronze", uri=f'postgres://{HOST}:{PORT}/{DBNAME}/raw_nyc_tlc_data')
+BRONZE_DATASET = Asset(name="postgres_bronze", uri=f"postgres://{HOST}:{PORT}/{DBNAME}/public/raw_nyc_tlc_data")
 
 @task
-def get_filename_list():
+def get_filename_list() -> List[str]:
+
+    """
+    Busca todos os arquivos .parquet.gz
+    _______
+        Retorna: Lista de str com nomes de arquivos
+    """
     
     file_list = [f for f in os.listdir(DATA_PATH) if f.endswith('.parquet.gz')]
 
@@ -32,6 +38,13 @@ def get_filename_list():
 
 @task
 def run_extraction(file_list: List[str]) -> Dict[str, Any]:
+
+    """
+    Dada a lista de arquivos, executa o extrator para cada arquivo
+    subindo os dados para a tabela raw
+    _______
+        Retorna: Dicionario com status da execucao
+    """
 
     # Import dentro da funcao para evitar encher a memoria
     # por conta do DAG File Processor
@@ -61,8 +74,6 @@ def emit_bronze(success_result: Dict[str, Any]):
     dag_id='bronze_nyc_parquet_to_postgres',
     default_args=DEFAULT_ARGS,
     start_date=datetime(2026, 1, 1),
-    schedule_interval=None,
-    catchup=False,
     tags=['bronze', 'nyc', 'postgres']
 )
 def bronze_extraction():

@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS raw_nyc_tlc_data (
     PULocationID INT,
     DOLocationID INT,
     payment_type INT,
-    fare_amount NUMERIC(10, 2),
+    fare_amount NUMERIC(12, 2),
     extra NUMERIC,
     mta_tax NUMERIC,
     tip_amount NUMERIC(10, 2),
@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS raw_nyc_tlc_data (
     total_amount NUMERIC(10, 2),
     congestion_surcharge NUMERIC(10, 2),
     airport_fee NUMERIC(10, 2)
-)
+);
 
 CREATE TABLE IF NOT EXISTS trusted_nyc_tlc_data (
     id SERIAL PRIMARY KEY,
+    VendorID INT,
     tpep_pickup_datetime TIMESTAMP,
     tpep_dropoff_datetime TIMESTAMP,
-    trip_distance NUMERIC
-)
+    trip_distance NUMERIC(10, 2)
+);

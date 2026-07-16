@@ -34,11 +34,12 @@ x-airflow-common:
     # The following line can be used to set a custom config file, stored in the local config folder
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     # Variaveis de ambiente para serem acessadas pelos scripts
-    DW_DB_HOST: ${DW_DB_HOST}
-    DW_DB_PORT: ${DW_DB_PORT}
-    DW_DB_NAME: ${DW_DB_NAME}
-    DW_DB_USER: ${DW_DB_USER}
-    DW_DB_PASSWORD: ${DW_DB_PASSWORD}
+    DW_DB_HOST: "postgres_dw"
+    DW_DB_PORT: "5432"
+    DW_DB_NAME: "nyc"
+    DW_DB_USER: "user"
+    DW_DB_PASSWORD: "datarisk"
+    ENV: "prod"
     PYTHONPATH: "/opt/airflow/src:/opt/airflow"
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
