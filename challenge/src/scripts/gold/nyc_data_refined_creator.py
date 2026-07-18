@@ -43,7 +43,7 @@ class JulyTripsViewCreator:
                 SELECT COUNT(*) AS total_july_trips
                 FROM pg.trusted_nyc_tlc_data
                 WHERE CAST(tpep_pickup_datetime AS DATE) = '2022-07-17'
-                    AND WHERE CAST(tpep_dropoff_datetime AS DATE) = '2022-07-17'
+                  AND CAST(tpep_dropoff_datetime AS DATE) = '2022-07-17'
             """
             )
 

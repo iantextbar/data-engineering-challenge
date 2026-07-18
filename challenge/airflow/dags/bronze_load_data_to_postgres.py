@@ -11,7 +11,7 @@ DEFAULT_ARGS = {'owner': 'airflow'}
 # Resgatando variaveis ambiente do docker compose
 ENV = os.environ.get("DW_DB_HOST", "prod")
 HOST = os.environ.get("DW_DB_HOST", "localhost")
-PORT = os.environ.get("DW_DB_PORT", "5433")
+PORT = os.environ.get("DW_DB_PORT", "5432")
 DBNAME = os.environ.get("DW_DB_NAME", "nyc")
 
 # Declarando asset
@@ -36,11 +36,11 @@ def get_filename_list() -> List[str]:
 
     return file_list
 
-@task
-def run_extraction(file_list: List[str]) -> Dict[str, Any]:
+@task(max_active_tis_per_dag=1)
+def run_extraction(file_name: str) -> Dict[str, Any]:
 
     """
-    Dada a lista de arquivos, executa o extrator para cada arquivo
+    Dado um arquivo, executa o extrator
     subindo os dados para a tabela raw
     _______
         Retorna: Dicionario com status da execucao
@@ -52,23 +52,27 @@ def run_extraction(file_list: List[str]) -> Dict[str, Any]:
 
     extractor = NYCExtractor()
 
-    success_count = 0
+    file_path = os.path.join(DATA_PATH, file_name)
 
-    for file_name in file_list:
+    result = extractor.insert_parquet_file(file_path)
 
-        file_path = os.path.join(DATA_PATH, file_name)
-
-        result = extractor.insert_parquet_file(file_path)
-
-        if result['statusCode'] == 200:
-            success_count += 1
-
-    return {'success_rate': success_count / len(file_list)}
+    if result['statusCode'] == 200:
+        return 1
+    
+    return 0
 
 @task(outlets=[BRONZE_DATASET])
-def emit_bronze(success_result: Dict[str, Any]):
-    return {'status': 'bronze_nyc_trips_updated',
-            'success_rate': success_result.get('success_rate')}
+def emit_bronze(results_list: List[int]) -> Dict[str, Any]:
+
+    if not results_list:
+        success_rate = 0.0
+    else:
+        success_rate = sum(results_list) / len(results_list)
+        
+    return {
+        'status': 'bronze_nyc_trips_updated',
+        'success_rate': success_rate
+    }
 
 @dag(
     dag_id='bronze_nyc_parquet_to_postgres',
@@ -80,10 +84,10 @@ def bronze_extraction():
     
     file_list = get_filename_list()
 
-    success_result = run_extraction(file_list)
+    success_results = run_extraction.expand(file_name=file_list)
 
-    emitted = emit_bronze(success_result)
+    emitted = emit_bronze(success_results)
 
-    file_list >> success_result >> emitted
+    file_list >> success_results >> emitted
 
 bronze_extraction()

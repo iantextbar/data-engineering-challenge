@@ -8,57 +8,43 @@ logger = logging.getLogger(__name__)
 class NYCTransformer:
 
     @staticmethod
-    def transform():
+    def create_index():
+        """Cria o índice na camada Bronze de forma isolada."""
+        logger.info("Garantindo a existência do índice de performance na Bronze...")
+        ConnectionInterface.execute("""
+            CREATE INDEX IF NOT EXISTS idx_raw_nyc_dedup 
+            ON pg.raw_nyc_tlc_data (VendorID, tpep_pickup_datetime, tpep_dropoff_datetime);
+        """)
+        logger.info("Índice verificado/criado com sucesso!")
 
-        """
-        Com base nos registro da raw_nyc_tlc_data, realiza deduplicacao, particionando os 
-        dados por corridas com o mesmo VendorID, tempo de inicio e final e pegando apenas o
-        primeiro registro da particao. Elimina registros errados, com distancia de corrida
-        menor ou igual a zero e sem valores de tempo de inicio e fim.
-        _______
-            Retorna: Dicionario com status da execucao
-        """
+    @staticmethod
+    def transform_month(mes: int) -> int:
+        """Processa a transformação de um único mês por vez."""
+        data_inicio = f"2022-{mes:02d}-01 00:00:00"
+        data_fim = f"2022-{mes+1:02d}-01 00:00:00" if mes < 12 else "2023-01-01 00:00:00"
 
-        logger.info(f"Iniciando extracao do arquivo")
+        logger.info(f"Iniciando lote Silver para o mês {mes}: {data_inicio} até {data_fim}")
 
-        try:
+        # Idempotência: Remove dados antigos do mês caso a task precise ser reexecutada
+        ConnectionInterface.execute(f"""
+            DELETE FROM pg.trusted_nyc_tlc_data 
+            WHERE tpep_pickup_datetime >= '{data_inicio}' AND tpep_pickup_datetime < '{data_fim}';
+        """)
 
-            ConnectionInterface.execute("""
-                INSERT INTO pg.trusted_nyc_tlc_data (
-                    VendorID,
-                    tpep_pickup_datetime,
-                    tpep_dropoff_datetime,
-                    trip_distance
-                )
-                SELECT
-                    VendorID,
-                    tpep_pickup_datetime,
-                    tpep_dropoff_datetime,
-                    trip_distance
-                FROM (
-                    SELECT 
-                        tpep_pickup_datetime,
-                        tpep_dropoff_datetime,
-                        trip_distance,
-                        VendorID, 
-                        ROW_NUMBER() OVER (
-                            PARTITION BY VendorID, tpep_pickup_datetime, tpep_dropoff_datetime 
-                            ORDER BY tpep_pickup_datetime
-                        ) as row_num
-                    FROM pg.raw_nyc_tlc_data
-                    WHERE trip_distance > 0 
-                      AND tpep_pickup_datetime IS NOT NULL
-                      AND tpep_dropoff_datetime IS NOT NULL
-                )
-                WHERE row_num = 1
-            """)
+        # Insere os dados fatiados (O Postgres usa o índice e processa muito mais rápido)
+        ConnectionInterface.execute(f"""
+            INSERT INTO pg.trusted_nyc_tlc_data (
+                VendorID, tpep_pickup_datetime, tpep_dropoff_datetime, trip_distance
+            )
+            SELECT DISTINCT ON (VendorID, tpep_pickup_datetime, tpep_dropoff_datetime)
+                VendorID, tpep_pickup_datetime, tpep_dropoff_datetime, trip_distance
+            FROM pg.raw_nyc_tlc_data
+            WHERE trip_distance > 0 
+              AND tpep_pickup_datetime >= '{data_inicio}'
+              AND tpep_pickup_datetime < '{data_fim}'
+              AND tpep_dropoff_datetime IS NOT NULL
+            ORDER BY VendorID, tpep_pickup_datetime, tpep_dropoff_datetime;
+        """)
 
-            logger.info('Sucesso na transformacao!')
-
-            return {'statusCode': 200}
-
-        except Exception as e:
-
-            logger.error(f'ERRO ao realizar transformação: {str(e)}')
-
-            return {'statusCode': 400}
+        logger.info(f"Mês {mes} consolidado com sucesso na Silver!")
+        return 200
